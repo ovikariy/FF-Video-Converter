@@ -50,6 +50,10 @@ namespace FFVideoConverter
             Height -= 30;
             gridSourceControls.Visibility = Visibility.Collapsed;
             mediaElementInput.PositionChanged += MediaElementInput_PositionChanged;
+            mediaElementInput.MediaFailed += (s, e) =>
+            {
+                MessageBox.Show(owner: this, messageBoxText: e.ErrorException.Message);
+            };
 
             comboBoxEncoder.Items.Add("H.264 (x264)");
             comboBoxEncoder.Items.Add("H.265 (x265)");
@@ -67,7 +71,7 @@ namespace FFVideoConverter
             }
             comboBoxQuality.SelectedIndex = 2;
             comboBoxResolution.Items.Add("Same as source");
-            comboBoxResolution.SelectedIndex = 0;            
+            comboBoxResolution.SelectedIndex = 0;
         }
 
         #region Load
@@ -134,7 +138,7 @@ namespace FFVideoConverter
             gridSourceControls.Visibility = Visibility.Visible;
 
             SetComboBoxFramerate(mediaInfo.Framerate);
-            SetComboBoxResolution(mediaInfo.Height);          
+            SetComboBoxResolution(mediaInfo.Height);
 
             buttonConvert.IsEnabled = true;
             buttonPreview.IsEnabled = true;
@@ -281,6 +285,19 @@ namespace FFVideoConverter
             }
         }
 
+        private void ButtonOpenCubeFile_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Title = "Select the CUBE file";
+            ofd.Multiselect = false;
+            ofd.Filter = "Cube files|*.CUBE";
+            bool? result = ofd.ShowDialog();
+            if (result == true)
+            {
+                textBoxCubeFile.Text = ofd.FileName;
+            }
+        }
+
         private void ButtonPreview_Click(object sender, RoutedEventArgs e)
         {
             if (isMediaOpen && mediaInfo.IsLocal && File.Exists(mediaInfo.Source))
@@ -312,7 +329,7 @@ namespace FFVideoConverter
                     textBoxStart.ClearValue(TextBox.ForegroundProperty);
                     textBoxStartTextChangedMethodRunner.Run(start);
                 }
-            }            
+            }
         }
 
         private void TextBoxEnd_TextChanged(object sender, TextChangedEventArgs e)
@@ -516,6 +533,10 @@ namespace FFVideoConverter
                     conversionOptions.End = end;
                 }
             }
+            if (!string.IsNullOrEmpty(textBoxCubeFile.Text))
+            {
+                conversionOptions.CubeFile = textBoxCubeFile.Text;
+            }
 
             ffmpegEngine.Convert(mediaInfo, textBoxDestination.Text, conversionOptions);
 
@@ -614,7 +635,7 @@ namespace FFVideoConverter
         {
             ffmpegEngine.ProgressChanged -= UpdateProgress;
             ffmpegEngine.StopConversion();
-            progressBarConvertProgress.ClearValue(ForegroundProperty); 
+            progressBarConvertProgress.ClearValue(ForegroundProperty);
             DoubleAnimation progressAnimation = new DoubleAnimation(0, TimeSpan.FromSeconds(0.5));
             progressBarConvertProgress.BeginAnimation(ProgressBar.ValueProperty, progressAnimation);
             textBlockProgress.Text = "Conversion canceled";
@@ -810,7 +831,7 @@ namespace FFVideoConverter
                 if (new_height + new_y > canvasCropVideo.ActualHeight)
                 {
                     if (MouseHitLocation == HitLocation.Body)
-                        new_y= canvasCropVideo.ActualHeight - new_height;
+                        new_y = canvasCropVideo.ActualHeight - new_height;
                     else new_height = canvasCropVideo.ActualHeight - new_y;
                 }
                 if (new_width < RECT_MIN_SIZE)
@@ -824,7 +845,7 @@ namespace FFVideoConverter
                 }
                 if (new_height < RECT_MIN_SIZE)
                 {
-                    if(MouseHitLocation == HitLocation.Top)
+                    if (MouseHitLocation == HitLocation.Top)
                     {
                         new_y -= offset_y;
                         new_height += offset_y;
@@ -866,7 +887,7 @@ namespace FFVideoConverter
             gridSourceControls.IsHitTestVisible = true;
             Storyboard storyboardIn = FindResource("mediaControlsAnimationIn") as Storyboard;
             Storyboard.SetTarget(storyboardIn, gridSourceControls);
-            storyboardIn.Completed += (s, _e) => { gridSourceControls.IsHitTestVisible = true; }; 
+            storyboardIn.Completed += (s, _e) => { gridSourceControls.IsHitTestVisible = true; };
             if (gridSourceControls.Opacity == 0) storyboardIn.Begin();
             Cursor = Cursors.Arrow;
         }

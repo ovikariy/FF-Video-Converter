@@ -75,6 +75,7 @@ namespace FFVideoConverter
         public TimeSpan Start { get; set; }
         public TimeSpan End { get; set; }
         public bool SkipAudio { get; set; }
+        public string CubeFile { get; set; }
 
         public ConversionOptions(Encoder encoder, byte preset, byte crf)
         {
@@ -141,9 +142,14 @@ namespace FFVideoConverter
             {
                 filters = $" -vf \"scale={conversionOptions.Resolution.Width}:{conversionOptions.Resolution.Height}\"";
             }
-            else if(conversionOptions.CropData.HasValue())
+            else if (conversionOptions.CropData.HasValue())
             {
                 filters = $" -vf \"crop=in_w-{conversionOptions.CropData.Left + conversionOptions.CropData.Right}:in_h-{conversionOptions.CropData.Top + conversionOptions.CropData.Bottom}:{conversionOptions.CropData.Left}:{conversionOptions.CropData.Top}\"";
+            }
+            if (!string.IsNullOrEmpty(conversionOptions.CubeFile))
+            {
+                var cubeFile = conversionOptions.CubeFile.Replace("C:", "").Replace("\\", "/");
+                filters = filters.TrimEnd('\"') + $", lut3d={cubeFile}\" -pix_fmt yuv420p";
             }
 
             StringBuilder sb = new StringBuilder("-y");
