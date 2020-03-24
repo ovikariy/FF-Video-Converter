@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -132,25 +133,7 @@ namespace FFVideoConverter
                 progressData.TotalTime = sourceInfo.Duration - conversionOptions.Start;
             }
 
-            string filters = "";
-            if (conversionOptions.Resolution.HasValue() && conversionOptions.CropData.HasValue())
-            {
-                filters = $" -vf \"scale={conversionOptions.Resolution.Width}:{conversionOptions.Resolution.Height}," +
-                          $" crop=in_w-{conversionOptions.CropData.Left + conversionOptions.CropData.Right}:in_h-{conversionOptions.CropData.Top + conversionOptions.CropData.Bottom}:{conversionOptions.CropData.Left}:{conversionOptions.CropData.Top}\"";
-            }
-            else if (conversionOptions.Resolution.HasValue())
-            {
-                filters = $" -vf \"scale={conversionOptions.Resolution.Width}:{conversionOptions.Resolution.Height}\"";
-            }
-            else if (conversionOptions.CropData.HasValue())
-            {
-                filters = $" -vf \"crop=in_w-{conversionOptions.CropData.Left + conversionOptions.CropData.Right}:in_h-{conversionOptions.CropData.Top + conversionOptions.CropData.Bottom}:{conversionOptions.CropData.Left}:{conversionOptions.CropData.Top}\"";
-            }
-            if (!string.IsNullOrEmpty(conversionOptions.CubeFile))
-            {
-                var cubeFile = conversionOptions.CubeFile.Replace("C:", "").Replace("\\", "/");
-                filters = filters.TrimEnd('\"') + $", lut3d={cubeFile}\" -pix_fmt yuv420p";
-            }
+            string filters = GetFilters(conversionOptions);
 
             StringBuilder sb = new StringBuilder("-y");
             sb.Append($" -ss {conversionOptions.Start} ");
@@ -181,6 +164,28 @@ namespace FFVideoConverter
             {
                 ConversionCompleted?.Invoke(progressData);
             }
+        }
+
+        string GetFilters(ConversionOptions conversionOptions)
+        {
+            List<String> filters = new List<string>();
+
+            if (conversionOptions.Resolution.HasValue())
+                filters.Add($"scale={conversionOptions.Resolution.Width}:{conversionOptions.Resolution.Height}");
+
+            if (conversionOptions.CropData.HasValue())
+                filters.Add($"crop=in_w-{conversionOptions.CropData.Left + conversionOptions.CropData.Right}:in_h-{conversionOptions.CropData.Top + conversionOptions.CropData.Bottom}:{conversionOptions.CropData.Left}:{conversionOptions.CropData.Top}");
+
+            if (!string.IsNullOrEmpty(conversionOptions.CubeFile))
+            {
+                /* colon ":" and backslash "\" are used by ffmpeg so must be escaped in the path so 
+                instead of c:\mypath\sample.CUBE on the command line should be c\\:/temp/sample.CUBE  
+                https://stackoverflow.com/questions/28035800/ffmpeg-could-not-load-font-c-cannot-escape-semi-colon */
+                var cubeFile = conversionOptions.CubeFile.Replace("\\", "/").Replace(":", "\\\\:");
+                filters.Add($"lut3d={cubeFile}"); 
+            }
+            filters.Add("format=yuv420p"); /* this is needed for MP4 files when using presets or lut3d filters https://stackoverflow.com/questions/52295933/ffmpeg-video-filters-corrupt-mp4-file  */
+            return " -vf \"" + string.Join(", ", filters) + "\"";
         }
 
         public async void FastCut(string source, string destination, string start, string end)
@@ -250,7 +255,7 @@ namespace FFVideoConverter
         {
             try
             {
-                if (convertProcess != null && !convertProcess.HasExited) 
+                if (convertProcess != null && !convertProcess.HasExited)
                     convertProcess.Kill();
             }
             catch (Exception)
