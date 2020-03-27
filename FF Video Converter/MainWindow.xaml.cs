@@ -581,6 +581,14 @@ namespace FFVideoConverter
 
         private async void ConversionCompleted(ProgressData progressData)
         {
+            if (progressData.ExitCode < 0)
+                return;  /* user aborted */
+            if (progressData.ExitCode > 0)
+            {
+                ShowMessage("FFMPEG Exited With Code " + progressData.ExitCode, "FFMPEG Output:", progressData.OutputText);
+                CancelProcess();
+                return;
+            }
             DoubleAnimation progressAnimation = new DoubleAnimation(100, TimeSpan.FromSeconds(0));
             progressBarConvertProgress.BeginAnimation(ProgressBar.ValueProperty, progressAnimation);
             textBlockProgress.Text = progressData.IsFastCut ? "Video cut!" : "Video converted!";
@@ -632,6 +640,11 @@ namespace FFVideoConverter
         }
 
         private void ButtonCancel_Click(object sender, RoutedEventArgs e)
+        {
+            CancelProcess();
+        }
+
+        private void CancelProcess()
         {
             ffmpegEngine.ProgressChanged -= UpdateProgress;
             ffmpegEngine.StopConversion();
@@ -1032,6 +1045,11 @@ namespace FFVideoConverter
         }
 
         #endregion
+
+        bool? ShowMessage(string title, string subTitle, string message)
+        {
+            return new MessageWindow(title, subTitle, message).ShowDialog();
+        }
 
     }
 }

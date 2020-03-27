@@ -21,6 +21,8 @@ namespace FFVideoConverter
         public TimeSpan TotalTime { get; set; }
         public uint CurrentFrame { get; set; }
         public bool IsFastCut { get; set; }
+        public int ExitCode { get; internal set; }
+        public string OutputText { get; internal set; }
     }
 
     public struct CropData
@@ -159,11 +161,8 @@ namespace FFVideoConverter
             });
             convertProcess.CancelErrorRead();
 
-            int exitCode = convertProcess.ExitCode;
-            if (exitCode == 0) //conversion not aborted
-            {
-                ConversionCompleted?.Invoke(progressData);
-            }
+            progressData.ExitCode = convertProcess.ExitCode;
+            ConversionCompleted?.Invoke(progressData);
         }
 
         string GetFilters(ConversionOptions conversionOptions)
@@ -182,7 +181,7 @@ namespace FFVideoConverter
                 instead of c:\mypath\sample.CUBE on the command line should be c\\:/temp/sample.CUBE  
                 https://stackoverflow.com/questions/28035800/ffmpeg-could-not-load-font-c-cannot-escape-semi-colon */
                 var cubeFile = conversionOptions.CubeFile.Replace("\\", "/").Replace(":", "\\\\:");
-                filters.Add($"lut3d={cubeFile}"); 
+                filters.Add($"lut3d={cubeFile}");
             }
             filters.Add("format=yuv420p"); /* this is needed for MP4 files when using presets or lut3d filters https://stackoverflow.com/questions/52295933/ffmpeg-video-filters-corrupt-mp4-file  */
             return " -vf \"" + string.Join(", ", filters) + "\"";
@@ -204,11 +203,8 @@ namespace FFVideoConverter
             });
             convertProcess.CancelErrorRead();
 
-            int exitCode = convertProcess.ExitCode;
-            if (exitCode == 0) //conversion not aborted
-            {
-                ConversionCompleted?.Invoke(progressData);
-            }
+            progressData.ExitCode = convertProcess.ExitCode;
+            ConversionCompleted?.Invoke(progressData);
         }
 
         private void ConvertProcess_ErrorDataReceived(object sender, DataReceivedEventArgs e)
@@ -221,6 +217,7 @@ namespace FFVideoConverter
             }
             else
             {
+                progressData.OutputText += line + "\r\n";
                 if (line.StartsWith("frame")) //frame=   47 fps=0.0 q=0.0 size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x    
                 {
                     progressData.CurrentFrame = System.Convert.ToUInt32(line.Remove(line.IndexOf(" fps")).Remove(0, 6));
