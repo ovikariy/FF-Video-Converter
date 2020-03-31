@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/FF Video Converter/bin/Debug/netcoreapp3.1/FFVideoConverter.dll",
-            "args": [],
+            "args": ["c:/temp/input.mp4"],
             "cwd": "${workspaceFolder}/FF Video Converter",
             "console": "internalConsole",
             "stopAtEntry": false

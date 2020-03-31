@@ -82,7 +82,7 @@ namespace FFVideoConverter
             {
                 string sourcePath = Environment.GetCommandLineArgs()[1];
                 string extension = Path.GetExtension(sourcePath);
-                if (Array.IndexOf(SUPPORTED_EXTENSIONS, extension) > -1)
+                if (IsSupportedExtension(extension))
                 {
                     mediaInfo = await MediaInfo.Open(sourcePath);
                     OpenSource();
@@ -232,7 +232,7 @@ namespace FFVideoConverter
             {
                 string[] paths = (string[])e.Data.GetData(DataFormats.FileDrop);
                 string extension = Path.GetExtension(paths[0]);
-                if (Array.IndexOf(SUPPORTED_EXTENSIONS, extension) > -1)
+                if (IsSupportedExtension(extension))
                 {
                     mediaInfo = await MediaInfo.Open(paths[0]);
                     OpenSource();
@@ -276,8 +276,8 @@ namespace FFVideoConverter
             sfd.Title = "Select the destination file";
             sfd.Filter = "MKV|*.mkv|MP4|*.mp4";
             sfd.FileName = Path.GetFileNameWithoutExtension(mediaInfo.Source) + "_x264";
-            string extension = mediaInfo.Source.Substring(mediaInfo.Source.LastIndexOf('.'));
-            if (extension == ".mp4") sfd.FilterIndex = 2;
+            string extension = Path.GetExtension(mediaInfo.Source) + "";
+            if (extension.ToLower() == ".mp4") sfd.FilterIndex = 2;
             bool? result = sfd.ShowDialog();
             if (result == true)
             {
@@ -481,7 +481,7 @@ namespace FFVideoConverter
 
         private async void ButtonConvert_Click(object sender, RoutedEventArgs e)
         {
-            if (textBoxDestination.Text.EndsWith("mp4") && mediaInfo.AudioCodec.ToLower() == "opus")
+            if (textBoxDestination.Text.EndsWith("mp4", true, System.Globalization.CultureInfo.InvariantCulture) && (mediaInfo.AudioCodec + "").ToLower() == "opus")
             {
                 MessageBox.Show("Opus audio in mp4 container is currently unsupported.\nEither use aac audio or mkv container.", "FF Video Converter");
                 return;
@@ -1049,6 +1049,11 @@ namespace FFVideoConverter
         bool? ShowMessage(string title, string subTitle, string message)
         {
             return new MessageWindow(title, subTitle, message).ShowDialog();
+        }
+
+        bool IsSupportedExtension(string extension)
+        {
+            return Array.Exists(SUPPORTED_EXTENSIONS, x => string.Equals(x, extension, StringComparison.InvariantCultureIgnoreCase));
         }
 
     }
