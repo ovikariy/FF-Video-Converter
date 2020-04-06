@@ -67,7 +67,10 @@ namespace FFVideoConverter
 
                     using (JsonDocument jsonOutput = JsonDocument.Parse(stdout))
                     {
-                        JsonElement streamsElement = jsonOutput.RootElement.GetProperty("streams");
+                        JsonElement streamsElement;
+                        if (!jsonOutput.RootElement.TryGetProperty("streams", out streamsElement))
+                            throw new ApplicationException("No streams found. Try again."); /* this seems to happen at random */
+
                         JsonElement videoStreamElement = streamsElement[0];
                         JsonElement audioStreamElement = new JsonElement();
                         for (int i = 0; i < streamsElement.GetArrayLength(); i++)

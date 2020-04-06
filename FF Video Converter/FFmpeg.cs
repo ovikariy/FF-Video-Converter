@@ -6,8 +6,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-
-
+using System.IO;
 namespace FFVideoConverter
 {
     [StructLayout(LayoutKind.Auto)]
@@ -23,6 +22,8 @@ namespace FFVideoConverter
         public bool IsFastCut { get; set; }
         public int ExitCode { get; internal set; }
         public string OutputText { get; internal set; }
+        public string InProcessText { get; set; }
+        public string CompletionText { get; set; }
     }
 
     public struct CropData
@@ -79,6 +80,7 @@ namespace FFVideoConverter
         public TimeSpan End { get; set; }
         public bool SkipAudio { get; set; }
         public string CubeFile { get; set; }
+        public bool Stabilize { get; set; }
 
         public ConversionOptions(Encoder encoder, byte preset, byte crf)
         {
@@ -112,6 +114,7 @@ namespace FFVideoConverter
         private ProgressData progressData;
         private int i = 0;
         private readonly AutoResetEvent errorWaitHandle = new AutoResetEvent(false);
+        private string TransformFilePath { get; set; }
 
         public FFmpegEngine()
         {
@@ -162,6 +165,8 @@ namespace FFVideoConverter
             convertProcess.CancelErrorRead();
 
             progressData.ExitCode = convertProcess.ExitCode;
+            progressData.CompletionText = "Video converted!";//TODO: if video file is 0 bytes, show message
+            CleanUpTransformFile();
             ConversionCompleted?.Invoke(progressData);
         }
 
@@ -177,14 +182,66 @@ namespace FFVideoConverter
 
             if (!string.IsNullOrEmpty(conversionOptions.CubeFile))
             {
-                /* colon ":" and backslash "\" are used by ffmpeg so must be escaped in the path so 
-                instead of c:\mypath\sample.CUBE on the command line should be c\\:/temp/sample.CUBE  
-                https://stackoverflow.com/questions/28035800/ffmpeg-could-not-load-font-c-cannot-escape-semi-colon */
-                var cubeFile = conversionOptions.CubeFile.Replace("\\", "/").Replace(":", "\\\\:");
+                var cubeFile = EscapeArgumentPath(conversionOptions.CubeFile);
                 filters.Add($"lut3d={cubeFile}");
+            }
+            if (conversionOptions.Stabilize)
+            {
+                if (!File.Exists(TransformFilePath))
+                    throw new ApplicationException("vidstabtransform: Invalid transform file path");
+                filters.Add($"vidstabtransform=zoom=2:smoothing=30:input={EscapeArgumentPath(TransformFilePath)},unsharp=5:5:0.8:5:5:0.4");
             }
             filters.Add("format=yuv420p"); /* this is needed for MP4 files when using presets or lut3d filters https://stackoverflow.com/questions/52295933/ffmpeg-video-filters-corrupt-mp4-file  */
             return " -vf \"" + string.Join(", ", filters) + "\"";
+        }
+
+        public async Task CreateTransformFile(MediaInfo sourceInfo, string destination, ConversionOptions conversionOptions)
+        {
+            /* Analyze video stabilization/deshaking. Perform pass 1 of 2, see vidstabtransform for pass 2.
+            This filter generates a file with relative translation and rotation transform information about subsequent frames, which is then used by the vidstabtransform filter.  */
+
+            TransformFilePath = Path.GetTempFileName();
+
+            progressData = new ProgressData();
+            progressData.IsFastCut = false;
+            if (conversionOptions.End != TimeSpan.Zero)
+                progressData.TotalTime = conversionOptions.End - conversionOptions.Start;
+            else
+                progressData.TotalTime = sourceInfo.Duration - conversionOptions.Start;
+
+            StringBuilder sb = new StringBuilder("-y");
+            sb.Append($" -i \"{sourceInfo.Source}\"");
+            sb.Append($" -vf \"vidstabdetect=shakiness=10:accuracy=15:result={EscapeArgumentPath(TransformFilePath)}\" ");
+
+            /* we only want the TRF result file from vidstabdetect not the output video but ffmpeg requires
+            output file to be specified so "-f null out.null" option tells ffmpeg not to generate the output file */
+            sb.Append($" -f null out.null");
+            sb.Append($" -hide_banner");
+
+            convertProcess.StartInfo.Arguments = sb.ToString();
+            convertProcess.Start();
+            convertProcess.BeginErrorReadLine();
+
+            progressData.InProcessText = "Generating stabilization transform file:";
+
+            await Task.Run(() =>
+            {
+                convertProcess.WaitForExit();
+                errorWaitHandle.WaitOne();
+            });
+            convertProcess.CancelErrorRead();
+
+            progressData.ExitCode = convertProcess.ExitCode;
+            progressData.CompletionText = "Transform file generated!";
+            ConversionCompleted?.Invoke(progressData);
+        }
+
+        public string EscapeArgumentPath(string filePath)
+        {
+            /* colon ":" and backslash "\" are used by ffmpeg so must be escaped in the path so 
+            instead of c:\mypath\sample.CUBE on the command line should be c\\:/temp/sample.CUBE  
+            https://stackoverflow.com/questions/28035800/ffmpeg-could-not-load-font-c-cannot-escape-semi-colon */
+            return (filePath + "").Replace("\\", "/").Replace(":", "\\\\:");
         }
 
         public async void FastCut(string source, string destination, string start, string end)
@@ -204,6 +261,7 @@ namespace FFVideoConverter
             convertProcess.CancelErrorRead();
 
             progressData.ExitCode = convertProcess.ExitCode;
+            progressData.CompletionText = "Video cut!";
             ConversionCompleted?.Invoke(progressData);
         }
 
@@ -222,7 +280,7 @@ namespace FFVideoConverter
                 {
                     progressData.CurrentFrame = System.Convert.ToUInt32(line.Remove(line.IndexOf(" fps")).Remove(0, 6));
                     progressData.EncodingSpeedFps = System.Convert.ToInt16(line.Remove(line.IndexOf(" q")).Remove(0, line.IndexOf("fps") + 4).Replace(".", ""));
-                    progressData.CurrentByteSize = System.Convert.ToInt32(line.Remove(line.IndexOf(" time") - 2).Remove(0, line.IndexOf("size") + 5)) * 1000;
+                    progressData.CurrentByteSize = line.Contains("size=N/A") ? 0 : System.Convert.ToInt32(line.Remove(line.IndexOf(" time") - 2).Remove(0, line.IndexOf("size") + 5)) * 1000;
                     progressData.CurrentTime = TimeSpan.Parse(line.Remove(line.IndexOf(" bit")).Remove(0, line.IndexOf("time") + 5));
                     float currentBitrate = line.Contains("bitrate=N/A") ? 0 : System.Convert.ToSingle(line.Remove(line.IndexOf("kbits")).Remove(0, line.IndexOf("bitrate") + 8), CultureInfo.InvariantCulture);
                     if (progressData.CurrentTime.Seconds > 5) //Skips first 5 seconds to give the encoder time to adjust it's bitrate
@@ -235,6 +293,19 @@ namespace FFVideoConverter
 
                     ProgressChanged?.Invoke(progressData);
                 }
+            }
+        }
+
+        private void CleanUpTransformFile()
+        {
+            if (!File.Exists(TransformFilePath))
+                return;
+            try
+            {
+                File.Delete(TransformFilePath);
+            }
+            catch (Exception)
+            {
             }
         }
 
@@ -254,6 +325,7 @@ namespace FFVideoConverter
             {
                 if (convertProcess != null && !convertProcess.HasExited)
                     convertProcess.Kill();
+                CleanUpTransformFile();
             }
             catch (Exception)
             {

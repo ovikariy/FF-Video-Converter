@@ -262,8 +262,10 @@
                 <TextBox x:Name="textBoxCubeFile" Margin="10,0,0,0" Padding="0,0,24,0"/>
                 <Button x:Name="buttonOpenCubeFile" Content="···" FontSize="19" Margin="0,1,4,0" Click="ButtonOpenCubeFile_Click" Style="{StaticResource ClearButton}" HorizontalAlignment="Right" VerticalAlignment="Top" Width="24" Height="23"/>
             </Grid>
-
-            <Grid x:Name="gridCut" Margin="332,46,10,0" Height="71" VerticalAlignment="Top" >
+            <Grid x:Name="gridStabilize" Margin="332,22,10,0" Height="71" VerticalAlignment="Top" >
+                <CheckBox x:Name="checkBoxStabilize" Content="Stabilize" HorizontalAlignment="Left" Margin="0,19,0,0" VerticalAlignment="Top" Height="30" Width="164"/>
+            </Grid>
+            <Grid x:Name="gridCut" Margin="332,58,10,0" Height="71" VerticalAlignment="Top" >
                 <TextBlock x:Name="textBlockStartBefore" HorizontalAlignment="Left" Margin="124,3,0,0" TextWrapping="Wrap" Text="00:00:00.00" VerticalAlignment="Top" Width="80" TextAlignment="Center" Cursor="Hand" Visibility="{Binding IsChecked, Converter={StaticResource BooleanToVisibilityConverter}, ElementName=checkBoxFastCut}" MouseLeftButtonDown="TextBlockStartBefore_MouseLeftButtonDown"/>
                 <TextBlock x:Name="textBlockStartAfter" HorizontalAlignment="Left" Margin="124,48,0,0" TextWrapping="Wrap" Text="00:00:00.00" VerticalAlignment="Top" Width="80" TextAlignment="Center" Cursor="Hand" Visibility="{Binding IsChecked, Converter={StaticResource BooleanToVisibilityConverter}, ElementName=checkBoxFastCut}" MouseLeftButtonDown="TextBlockStartAfter_MouseLeftButtonDown"/>
                 <TextBox x:Name="textBoxStart" HorizontalAlignment="Left" Height="25" Margin="124,22,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="90" local:TimespanTextbox.MaxTime="10:00:00.00" TextChanged="TextBoxStart_TextChanged" />

@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -17,7 +18,7 @@ namespace FFVideoConverter
     {
         public static readonly string[] QUALITY = { "Best", "Very good", "Good", "Medium", "Low", "Very low" };
 
-        private static readonly string[] SUPPORTED_EXTENSIONS = { ".mkv", ".mp4", ".avi", "m4v", ".webm", ".m3u8" };
+        private static readonly string[] SUPPORTED_EXTENSIONS = { ".mov", ".mkv", ".mp4", ".avi", "m4v", ".webm", ".m3u8" };
         private FFmpegEngine ffmpegEngine = new FFmpegEngine();
         private readonly MethodRunner<TimeSpan> textBoxStartTextChangedMethodRunner;
         private MediaInfo mediaInfo;
@@ -538,8 +539,20 @@ namespace FFVideoConverter
                 conversionOptions.CubeFile = textBoxCubeFile.Text;
             }
 
-            ffmpegEngine.Convert(mediaInfo, textBoxDestination.Text, conversionOptions);
+            if (checkBoxStabilize.IsChecked == true)
+            {
+                textBlockProgress.Text = "Generating stabilization transform file...";
+                await EnableDisableButtonsWhileProcessIsRunning();
+                conversionOptions.Stabilize = true;
+                await ffmpegEngine.CreateTransformFile(mediaInfo, textBoxDestination.Text, conversionOptions);
+            }
 
+            await EnableDisableButtonsWhileProcessIsRunning();
+            ffmpegEngine.Convert(mediaInfo, textBoxDestination.Text, conversionOptions);
+        }
+
+        private async Task EnableDisableButtonsWhileProcessIsRunning()
+        {
             currentOutputPath = textBoxDestination.Text;
             buttonPauseResume.IsEnabled = true;
             buttonCancel.IsEnabled = true;
@@ -575,13 +588,15 @@ namespace FFVideoConverter
                 textBlockSize.Text = $"Output size: {GetBytesReadable(progressData.CurrentByteSize)}";
                 if (progressData.AverageBitrate > 0) textBlockSize.Text += $" / {GetBytesReadable(approximateOutputByteSize)} (estimated)";
                 Title = Math.Floor(percentage) + "%   " + TimeSpan.FromSeconds(remainingTime).ToString(@"hh\:mm\:ss");
-                labelProgress.Content = $"Progress: {Math.Floor(percentage)}%   Remaining time: {TimeSpan.FromSeconds(remainingTime).ToString(@"hh\:mm\:ss")}";
+                labelProgress.Content =
+                    (!string.IsNullOrEmpty(progressData.InProcessText) ? progressData.InProcessText : "Progress:") +
+                    $" {Math.Floor(percentage)}%   Remaining time: {TimeSpan.FromSeconds(remainingTime).ToString(@"hh\:mm\:ss")}";
             }, System.Windows.Threading.DispatcherPriority.Send);
         }
 
         private async void ConversionCompleted(ProgressData progressData)
         {
-            if (progressData.ExitCode < 0)
+            if (progressData.ExitCode == -1)
                 return;  /* user aborted */
             if (progressData.ExitCode > 0)
             {
@@ -591,9 +606,7 @@ namespace FFVideoConverter
             }
             DoubleAnimation progressAnimation = new DoubleAnimation(100, TimeSpan.FromSeconds(0));
             progressBarConvertProgress.BeginAnimation(ProgressBar.ValueProperty, progressAnimation);
-            textBlockProgress.Text = progressData.IsFastCut ? "Video cut!" : "Video converted!";
-            string outputSize = GetBytesReadable(new FileInfo(currentOutputPath).Length);
-            textBlockSize.Text = "Output size: " + outputSize;
+            textBlockProgress.Text = progressData.CompletionText;
             TaskbarItemInfo.ProgressState = TaskbarItemProgressState.None;
             Storyboard storyboard = FindResource("ProgressAnimationOut") as Storyboard;
             storyboard.Begin();
@@ -609,6 +622,16 @@ namespace FFVideoConverter
             buttonOpenOutput.Visibility = Visibility.Visible;
             Title = "AVC to HEVC Converter";
 
+            if (string.IsNullOrEmpty(currentOutputPath) || !File.Exists(currentOutputPath))
+                return;
+
+            long outputFileSize = new FileInfo(currentOutputPath).Length;
+            if (outputFileSize == 0)
+                return;
+
+            string outputSize = GetBytesReadable(outputFileSize);
+            textBlockSize.Text = "Output size: " + outputSize;
+
             MediaInfo outputFile = await MediaInfo.Open(currentOutputPath);
             textBlockDuration.Text += $"   ⟶   {outputFile.Duration.ToString(@"hh\:mm\:ss\.ff")}";
             textBlockCodec.Text += $"   ⟶   {outputFile.Codec} / {outputFile.AudioCodec}";
@@ -617,6 +640,7 @@ namespace FFVideoConverter
             textBlockResolution.Text += $"   ⟶   {outputFile.Width + "x" + outputFile.Height}";
             textBlockInputSize.Text += $"   ⟶   {outputSize}";
             if (!String.IsNullOrEmpty(outputFile.AspectRatio) && outputFile.AspectRatio != "N/A") textBlockResolution.Text += $" ({outputFile.AspectRatio})";
+
         }
 
         private void ButtonPauseResume_Click(object sender, RoutedEventArgs e)
