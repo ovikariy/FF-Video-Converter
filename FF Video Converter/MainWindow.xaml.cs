@@ -32,6 +32,8 @@ namespace FFVideoConverter
         private bool webStream = false;
         private bool isMediaOpen = false;
 
+        private string LogViewerContent = "";
+
         enum HitLocation
         {
             None, Body, UpperLeft, UpperRight, LowerRight, LowerLeft, Left, Right, Top, Bottom
@@ -493,6 +495,7 @@ namespace FFVideoConverter
             ffmpegEngine = new FFmpegEngine();
             ffmpegEngine.ProgressChanged += UpdateProgress;
             ffmpegEngine.ConversionCompleted += ConversionCompleted;
+            ffmpegEngine.Log += LogMessage;
             Encoder selectedEncoder = comboBoxEncoder.SelectedIndex == 0 ? Encoder.H264 : Encoder.H265;
             ConversionOptions conversionOptions = new ConversionOptions(selectedEncoder, (byte)comboBoxPreset.SelectedIndex, GetCRFFromQuality(comboBoxQuality.Text, selectedEncoder));
             if (checkBoxCrop.IsChecked == true)
@@ -571,8 +574,13 @@ namespace FFVideoConverter
             TaskbarItemInfo.ProgressState = TaskbarItemProgressState.Normal;
         }
 
+        private void LogMessage(string message) {
+            LogViewerContent += "\r\n" + message;
+        }
+
         private void UpdateProgress(ProgressData progressData)
         {
+
             double secondsToEncode = progressData.TotalTime.TotalSeconds - progressData.CurrentTime.TotalSeconds;
             double remainingTime = progressData.EncodingSpeed == 0 ? 0 : (secondsToEncode) / progressData.EncodingSpeed;
             double percentage = Math.Min(progressData.CurrentFrame * 100 / (outputFps * progressData.TotalTime.TotalSeconds), 99.4);
@@ -671,6 +679,7 @@ namespace FFVideoConverter
         private void CancelProcess()
         {
             ffmpegEngine.ProgressChanged -= UpdateProgress;
+            ffmpegEngine.Log -= LogMessage;
             ffmpegEngine.StopConversion();
             progressBarConvertProgress.ClearValue(ForegroundProperty);
             DoubleAnimation progressAnimation = new DoubleAnimation(0, TimeSpan.FromSeconds(0.5));
@@ -696,6 +705,11 @@ namespace FFVideoConverter
         private void ButtonOpenOutput_Click(object sender, RoutedEventArgs e)
         {
             Process.Start(currentOutputPath);
+        }
+
+        private void ButtonViewLog_Click(object sender, RoutedEventArgs e)
+        {
+            ShowMessage("Log Viewer", null, LogViewerContent);
         }
 
         #endregion

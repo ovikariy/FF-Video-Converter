@@ -1027,4 +1027,20 @@
         </Setter>
     </Style>
 
+    <Style TargetType="{x:Type Button}" x:Key="LinkButton">
+        <Setter Property="Background" Value="{x:Null}" />
+        <Setter Property="BorderBrush" Value="{x:Null}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="border" Background="Transparent" SnapsToDevicePixels="True">
+                        <TextBlock Foreground="#FF2669DE" TextDecorations="Underline" FontSize="{TemplateBinding FontSize}" Text="{TemplateBinding Content}" TextAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>    
+
 </ResourceDictionary>

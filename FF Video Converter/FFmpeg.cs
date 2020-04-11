@@ -106,6 +106,8 @@ namespace FFVideoConverter
     public class FFmpegEngine
     {
         public delegate void ConversionEventHandler(ProgressData progressData);
+        public delegate void LogEventHandler(string message);
+        public event LogEventHandler Log;
         public event ConversionEventHandler ProgressChanged;
         public event ConversionEventHandler ConversionCompleted;
         public static readonly string[] PRESETS = { "veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast" };
@@ -154,6 +156,9 @@ namespace FFVideoConverter
             sb.Append($" \"{destination}\" -hide_banner");
 
             convertProcess.StartInfo.Arguments = sb.ToString();
+
+            Log?.Invoke("Executing command: \r\n\r\n" + convertProcess.StartInfo.FileName + " " + convertProcess.StartInfo.Arguments + "\r\n");
+
             convertProcess.Start();
             convertProcess.BeginErrorReadLine();
 
@@ -165,7 +170,15 @@ namespace FFVideoConverter
             convertProcess.CancelErrorRead();
 
             progressData.ExitCode = convertProcess.ExitCode;
-            progressData.CompletionText = "Video converted!";//TODO: if video file is 0 bytes, show message
+            progressData.CompletionText = "Video converted!";
+
+            if (!string.IsNullOrEmpty(destination) || !File.Exists(destination))
+            {
+                long outputFileSize = new FileInfo(destination).Length;
+                if (outputFileSize == 0)
+                    progressData.CompletionText = "Processed exited but output is empty. View log for details.";
+            }
+            Log?.Invoke("\r\n" + progressData.CompletionText + "\r\n");
             CleanUpTransformFile();
             ConversionCompleted?.Invoke(progressData);
         }
@@ -219,6 +232,9 @@ namespace FFVideoConverter
             sb.Append($" -hide_banner");
 
             convertProcess.StartInfo.Arguments = sb.ToString();
+
+            Log?.Invoke("Executing command: \r\n\r\n" + convertProcess.StartInfo.FileName + " " + convertProcess.StartInfo.Arguments + "\r\n");
+
             convertProcess.Start();
             convertProcess.BeginErrorReadLine();
 
@@ -233,6 +249,7 @@ namespace FFVideoConverter
 
             progressData.ExitCode = convertProcess.ExitCode;
             progressData.CompletionText = "Transform file generated!";
+            Log?.Invoke("\r\n" + progressData.CompletionText + "\r\n");
             ConversionCompleted?.Invoke(progressData);
         }
 
@@ -250,6 +267,7 @@ namespace FFVideoConverter
             progressData.IsFastCut = true;
             progressData.TotalTime = TimeSpan.Parse(end) - TimeSpan.Parse(start);
             convertProcess.StartInfo.Arguments = $"-y -ss {start} -to {end} -i \"{source}\" -c copy -avoid_negative_ts 1 \"{destination}\"";
+            Log?.Invoke("Executing command: \r\n\r\n" + convertProcess.StartInfo.FileName + " " + convertProcess.StartInfo.Arguments + "\r\n");
             convertProcess.Start();
             convertProcess.BeginErrorReadLine();
 
@@ -262,6 +280,7 @@ namespace FFVideoConverter
 
             progressData.ExitCode = convertProcess.ExitCode;
             progressData.CompletionText = "Video cut!";
+            Log?.Invoke("\r\n" + progressData.CompletionText + "\r\n");
             ConversionCompleted?.Invoke(progressData);
         }
 
@@ -275,6 +294,7 @@ namespace FFVideoConverter
             }
             else
             {
+                Log?.Invoke(line);
                 progressData.OutputText += line + "\r\n";
                 if (line.StartsWith("frame")) //frame=   47 fps=0.0 q=0.0 size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x    
                 {

@@ -21,6 +21,7 @@ namespace FFVideoConverter
         {
             labelTitle.Content = this.title;
             textBoxSubtitle.Content = this.subTitle;
+            gridSubtitle.Visibility = string.IsNullOrEmpty(this.subTitle) ? Visibility.Hidden : Visibility.Visible;
             textBoxMessage.AppendText(this.message);
             textBoxMessage.ScrollToEnd();
         }

@@ -353,7 +353,8 @@
             </Grid>
             <TextBlock x:Name="textBlockProgress" TextWrapping="Wrap" VerticalAlignment="Top" Margin="13,35,476,-1" Height="23"/>
             <TextBlock x:Name="textBlockSize" TextWrapping="Wrap" VerticalAlignment="Top" Margin="13,59,476,-25" Height="23"/>
-            <Button x:Name="buttonOpenOutput" Margin="687,44,0,-15" Height="28" Visibility="Hidden" VerticalAlignment="Top" Content="Open converted file" Click="ButtonOpenOutput_Click" HorizontalAlignment="Left" Width="147" />
+            <Button x:Name="buttonViewLog" Margin="567,50,0,-15" Height="28" VerticalAlignment="Top" Content="View Log" Click="ButtonViewLog_Click" HorizontalAlignment="Left" Width="147" Style="{StaticResource LinkButton}" />
+            <Button x:Name="buttonOpenOutput" Margin="687,44,0,-15" Height="28"  VerticalAlignment="Top" Content="Open converted file" Click="ButtonOpenOutput_Click" HorizontalAlignment="Left" Width="147" />
         </Grid>
     </Grid>
 </Window>
